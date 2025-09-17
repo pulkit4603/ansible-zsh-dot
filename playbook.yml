@@ -1,0 +1,54 @@
+---
+- name: Setup Zsh with powerlevel10k config
+  hosts: localhost
+  become: yes
+  vars:
+    repo_url: "https://github.com/pulkit4603/ansible-zsh-dot.git"
+    dotfiles_dir: "{{ ansible_env.HOME }}/.dotfiles"
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - zsh
+          - git
+        state: present
+        update_cache: yes
+
+    - name: Clone dotfiles repository
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ dotfiles_dir }}"
+        version: main
+        force: yes
+
+    - name: Backup existing .zshrc if present
+      command: mv {{ ansible_env.HOME }}/.zshrc {{ ansible_env.HOME }}/.zshrc.bak
+      args:
+        removes: "{{ ansible_env.HOME }}/.zshrc"
+      ignore_errors: yes
+
+    - name: Backup existing .p10k.zsh if present
+      command: mv {{ ansible_env.HOME }}/.p10k.zsh {{ ansible_env.HOME }}/.p10k.zsh.bak
+      args:
+        removes: "{{ ansible_env.HOME }}/.p10k.zsh"
+      ignore_errors: yes
+
+    - name: Link .zshrc
+      file:
+        src: "{{ dotfiles_dir }}/.zshrc"
+        dest: "{{ ansible_env.HOME }}/.zshrc"
+        state: link
+        force: yes
+
+    - name: Link .p10k.zsh
+      file:
+        src: "{{ dotfiles_dir }}/.p10k.zsh"
+        dest: "{{ ansible_env.HOME }}/.p10k.zsh"
+        state: link
+        force: yes
+
+    - name: Change default shell to zsh
+      user:
+        name: "{{ ansible_user_id }}"
+        shell: /usr/bin/zsh
