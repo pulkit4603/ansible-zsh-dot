@@ -1,19 +1,35 @@
 ---
 - name: Setup Zsh with powerlevel10k config
   hosts: localhost
-  become: yes
   vars:
     repo_url: "https://github.com/pulkit4603/ansible-zsh-dot.git"
+    user_home: "{{ ansible_env.HOME }}"
     dotfiles_dir: "{{ ansible_env.HOME }}/.dotfiles"
-
+    target_user: "{{ ansible_env.USER }}"
   tasks:
-    - name: Install required packages
+    - name: Install required packages (Debian/Ubuntu)
+      become: yes
       apt:
         name:
           - zsh
           - git
         state: present
         update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install required packages (RedHat/CentOS/Fedora)
+      become: yes
+      package:
+        name:
+          - zsh
+          - git
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Get zsh path
+      command: which zsh
+      register: zsh_path
+      changed_when: false
 
     - name: Clone dotfiles repository
       git:
@@ -23,32 +39,37 @@
         force: yes
 
     - name: Backup existing .zshrc if present
-      command: mv {{ ansible_env.HOME }}/.zshrc {{ ansible_env.HOME }}/.zshrc.bak
+      command: mv "{{ user_home }}/.zshrc" "{{ user_home }}/.zshrc.bak"
       args:
-        removes: "{{ ansible_env.HOME }}/.zshrc"
+        removes: "{{ user_home }}/.zshrc"
       ignore_errors: yes
 
     - name: Backup existing .p10k.zsh if present
-      command: mv {{ ansible_env.HOME }}/.p10k.zsh {{ ansible_env.HOME }}/.p10k.zsh.bak
+      command: mv "{{ user_home }}/.p10k.zsh" "{{ user_home }}/.p10k.zsh.bak"
       args:
-        removes: "{{ ansible_env.HOME }}/.p10k.zsh"
+        removes: "{{ user_home }}/.p10k.zsh"
       ignore_errors: yes
 
     - name: Link .zshrc
       file:
         src: "{{ dotfiles_dir }}/.zshrc"
-        dest: "{{ ansible_env.HOME }}/.zshrc"
+        dest: "{{ user_home }}/.zshrc"
         state: link
         force: yes
 
     - name: Link .p10k.zsh
       file:
         src: "{{ dotfiles_dir }}/.p10k.zsh"
-        dest: "{{ ansible_env.HOME }}/.p10k.zsh"
+        dest: "{{ user_home }}/.p10k.zsh"
         state: link
         force: yes
 
     - name: Change default shell to zsh
+      become: yes
       user:
-        name: "{{ ansible_user_id }}"
-        shell: /usr/bin/zsh
+        name: "{{ target_user }}"
+        shell: "{{ zsh_path.stdout }}"
+
+    - name: Display completion message
+      debug:
+        msg: "Zsh setup complete! Please log out and log back in, or run 'exec zsh' to start using your new shell."
